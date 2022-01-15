@@ -13,7 +13,7 @@ resource "random_pet" "p" {
 }
 
 locals {
-  resource_name = format("%s%s", "aadds", random_pet.p.id)
+  resource_name = format("%s%s", "idops", random_pet.p.id)
 }
 
 resource "azurerm_resource_group" "aadds" {
@@ -99,7 +99,7 @@ resource "azurerm_subnet_network_security_group_association" "aadds" {
 # AZURE VNET PEERING
 ##############################################
 
-resource "azurerm_virtual_network_peering" "network" {
+resource "azurerm_virtual_network_peering" "aadds" {
   for_each                     = { for vp in var.vnet_peerings : vp.peering_name => vp }
   name                         = each.value["peering_name"]
   remote_virtual_network_id    = each.value["resource_id"]
