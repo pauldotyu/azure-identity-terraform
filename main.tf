@@ -19,6 +19,7 @@ locals {
 resource "azurerm_resource_group" "aadds" {
   name     = "rg-${local.resource_name}"
   location = var.location
+  tags     = var.tags
 }
 
 resource "azurerm_virtual_network" "aadds" {
@@ -27,6 +28,7 @@ resource "azurerm_virtual_network" "aadds" {
   resource_group_name = azurerm_resource_group.aadds.name
   address_space       = var.aadds_vnet_prefixes
   dns_servers         = var.aadds_vnet_custom_dns_servers
+  tags                = var.tags
 }
 
 resource "azurerm_subnet" "aadds" {
@@ -88,6 +90,8 @@ resource "azurerm_network_security_group" "aadds" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+
+  tags = var.tags
 }
 
 resource "azurerm_subnet_network_security_group_association" "aadds" {
