@@ -1,11 +1,8 @@
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id
 }
 
-provider "azuread" {
-
-}
+provider "azuread" {}
 
 resource "random_pet" "p" {
   length    = 1
@@ -317,6 +314,58 @@ resource "azurerm_virtual_machine_extension" "aadds" {
   depends_on = [
     azuread_group_member.aadds,
     azurerm_windows_virtual_machine.aadds
+  ]
+}
+
+# https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-install?tabs=ARMAgentPowerShell%2CPowerShellWindows%2CPowerShellWindowsArc%2CCLIWindows%2CCLIWindowsArc#virtual-machine-extension-details
+resource "azurerm_virtual_machine_extension" "ama" {
+  name                       = "AzureMonitorWindowsAgent"
+  virtual_machine_id         = azurerm_windows_virtual_machine.aadds.id
+  publisher                  = "Microsoft.Azure.Monitor"
+  type                       = "AzureMonitorWindowsAgent"
+  type_handler_version       = "1.0"
+  auto_upgrade_minor_version = true
+
+  depends_on = [
+    azurerm_virtual_machine_extension.aadds
+  ]
+}
+
+# https://docs.microsoft.com/en-us/azure/virtual-machines/extensions/oms-windows?toc=/azure/azure-monitor/toc.json
+resource "azurerm_virtual_machine_extension" "mma" {
+  name                       = "MicrosoftMonitoringAgent"
+  virtual_machine_id         = azurerm_windows_virtual_machine.aadds.id
+  publisher                  = "Microsoft.EnterpriseCloud.Monitoring"
+  type                       = "MicrosoftMonitoringAgent"
+  type_handler_version       = "1.0"
+  auto_upgrade_minor_version = true
+  settings                   = <<SETTINGS
+    {
+      "workspaceId":"${var.log_analytics_workspace_id}"
+    }
+  SETTINGS
+
+  protected_settings = <<PROTECTED_SETTINGS
+    {
+      "workspaceKey":"${var.log_analytics_workspace_key}"
+    }
+  PROTECTED_SETTINGS
+
+  depends_on = [
+    azurerm_virtual_machine_extension.aadds
+  ]
+}
+
+resource "azurerm_virtual_machine_extension" "da" {
+  name                       = "DependencyAgentWindows"
+  virtual_machine_id         = azurerm_windows_virtual_machine.aadds.id
+  publisher                  = "Microsoft.Azure.Monitoring.DependencyAgent"
+  type                       = "DependencyAgentWindows"
+  type_handler_version       = "9.5"
+  auto_upgrade_minor_version = true
+
+  depends_on = [
+    azurerm_virtual_machine_extension.aadds
   ]
 }
 

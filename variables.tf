@@ -1,7 +1,3 @@
-variable "subscription_id" {
-  type = string
-}
-
 variable "location" {
   type        = string
   description = "Location of Azure resources"
@@ -101,6 +97,16 @@ variable "domain_admin_username" {
 }
 
 variable "domain_admin_password" {
+  type        = string
+  description = "(optional) describe your variable"
+}
+
+variable "log_analytics_workspace_id" {
+  type        = string
+  description = "(optional) describe your variable"
+}
+
+variable "log_analytics_workspace_key" {
   type        = string
   description = "(optional) describe your variable"
 }
