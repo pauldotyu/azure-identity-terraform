@@ -13,6 +13,64 @@ locals {
   resource_name = format("%s%s", "idops", random_pet.p.id)
 }
 
+provider "azurerm" {
+  features {}
+  alias           = "devops"
+  subscription_id = var.devops_subscription_id
+}
+
+provider "azurerm" {
+  features {}
+  alias           = "netops"
+  subscription_id = var.netops_subscription_id
+}
+
+data "azurerm_key_vault" "devops" {
+  provider            = azurerm.devops
+  name                = var.devops_keyvault_name
+  resource_group_name = var.devops_keyvault_rg_name
+}
+
+data "azurerm_key_vault_secret" "local_vm_username" {
+  provider     = azurerm.devops
+  name         = "local-vm-username"
+  key_vault_id = data.azurerm_key_vault.devops.id
+}
+
+data "azurerm_key_vault_secret" "local_vm_password" {
+  provider     = azurerm.devops
+  name         = "local-vm-password"
+  key_vault_id = data.azurerm_key_vault.devops.id
+}
+
+data "azurerm_key_vault_secret" "domain_admin_username" {
+  provider     = azurerm.devops
+  name         = "domain-admin-username"
+  key_vault_id = data.azurerm_key_vault.devops.id
+}
+
+data "azurerm_key_vault_secret" "domain_admin_password" {
+  provider     = azurerm.devops
+  name         = "domain-admin-password"
+  key_vault_id = data.azurerm_key_vault.devops.id
+}
+
+data "azurerm_key_vault_secret" "secops_law_workspace_id" {
+  provider     = azurerm.devops
+  name         = "secops-law-workspace-id"
+  key_vault_id = data.azurerm_key_vault.devops.id
+}
+
+data "azurerm_key_vault_secret" "secops_law_workspace_key" {
+  provider     = azurerm.devops
+  name         = "secops-law-workspace-key"
+  key_vault_id = data.azurerm_key_vault.devops.id
+}
+
+####################################
+# DEPLOY IDENTITY RESOURCES
+####################################
+
 resource "azurerm_resource_group" "aadds" {
   name     = "rg-${local.resource_name}"
   location = var.location
@@ -96,20 +154,47 @@ resource "azurerm_subnet_network_security_group_association" "aadds" {
   network_security_group_id = azurerm_network_security_group.aadds.id
 }
 
-##############################################
-# AZURE VNET PEERING
-##############################################
+##########################################
+# VIRTUAL NETWORK PEERING - NETOPS
+##########################################
 
-resource "azurerm_virtual_network_peering" "aadds" {
-  for_each                     = { for vp in var.vnet_peerings : vp.peering_name => vp }
-  name                         = each.value["peering_name"]
-  remote_virtual_network_id    = each.value["resource_id"]
+# Get resources by type, create vnet peerings
+data "azurerm_resources" "vnets" {
+  provider = azurerm.netops
+  type     = "Microsoft.Network/virtualNetworks"
+
+  required_tags = {
+    role = var.netops_role_tag_value
+  }
+}
+
+# this will peer out to all the virtual networks tagged with a role of azops
+resource "azurerm_virtual_network_peering" "out" {
+  count                        = length(data.azurerm_resources.vnets.resources)
+  name                         = data.azurerm_resources.vnets.resources[count.index].name
+  remote_virtual_network_id    = data.azurerm_resources.vnets.resources[count.index].id
   resource_group_name          = azurerm_resource_group.aadds.name
-  virtual_network_name         = azurerm_virtual_network.aadds.name # update module to include vnet in its ouput
+  virtual_network_name         = azurerm_virtual_network.aadds.name
   allow_virtual_network_access = true
   allow_forwarded_traffic      = true
   allow_gateway_transit        = false
   use_remote_gateways          = true
+}
+
+# this will peer in from all the virtual networks tagged with the role of azops
+# this also needs work. right now it is using variables when it should be using the data resource pulled from above;
+# howver, the challenge is that the data resource does not return the resrouces' resource group which is required for peering
+resource "azurerm_virtual_network_peering" "in" {
+  provider                     = azurerm.netops
+  count                        = length(data.azurerm_resources.vnets.resources)
+  name                         = azurerm_virtual_network.aadds.name
+  remote_virtual_network_id    = azurerm_virtual_network.aadds.id
+  resource_group_name          = split("/", data.azurerm_resources.vnets.resources[count.index].id)[4]
+  virtual_network_name         = data.azurerm_resources.vnets.resources[count.index].name
+  allow_virtual_network_access = true
+  allow_forwarded_traffic      = true
+  allow_gateway_transit        = true
+  use_remote_gateways          = false
 }
 
 #############################################
@@ -184,9 +269,9 @@ data "azuread_group" "aadds" {
 }
 
 resource "azuread_user" "aadds" {
-  user_principal_name = var.domain_admin_username
+  user_principal_name = format("%s%s", split("@", data.azurerm_key_vault_secret.domain_admin_username.value)[0], "@contoso.fun")
   display_name        = "Domain Joiner"
-  password            = var.domain_admin_password
+  password            = data.azurerm_key_vault_secret.domain_admin_password.value
 
   depends_on = [
     azurerm_active_directory_domain_service.aadds
@@ -232,8 +317,8 @@ resource "azurerm_windows_virtual_machine" "aadds" {
   resource_group_name = azurerm_resource_group.aadds.name
   location            = azurerm_resource_group.aadds.location
   size                = "Standard_B2ms"
-  admin_username      = var.local_vm_username
-  admin_password      = var.local_vm_password
+  admin_username      = data.azurerm_key_vault_secret.local_vm_username.value
+  admin_password      = data.azurerm_key_vault_secret.local_vm_password.value
   license_type        = "Windows_Server"
   tags                = var.tags
 
@@ -299,7 +384,7 @@ resource "azurerm_virtual_machine_extension" "aadds" {
   settings = <<SETTINGS
     {
       "Name": "${var.aadds_domain_name}",
-      "User": "${var.aadds_domain_join_username}",
+      "User": "${data.azurerm_key_vault_secret.domain_admin_username.value}",
       "Restart": "true",
       "Options": "3"
     }
@@ -307,7 +392,7 @@ resource "azurerm_virtual_machine_extension" "aadds" {
 
   protected_settings = <<PROTECTED_SETTINGS
     {
-      "Password": "${var.domain_admin_password}"
+      "Password": "${data.azurerm_key_vault_secret.domain_admin_password.value}"
     }
   PROTECTED_SETTINGS
 
@@ -341,13 +426,13 @@ resource "azurerm_virtual_machine_extension" "mma" {
   auto_upgrade_minor_version = true
   settings                   = <<SETTINGS
     {
-      "workspaceId":"${var.log_analytics_workspace_id}"
+      "workspaceId":"${data.azurerm_key_vault_secret.secops_law_workspace_id.value}"
     }
   SETTINGS
 
   protected_settings = <<PROTECTED_SETTINGS
     {
-      "workspaceKey":"${var.log_analytics_workspace_key}"
+      "workspaceKey":"${data.azurerm_key_vault_secret.secops_law_workspace_key.value}"
     }
   PROTECTED_SETTINGS
 

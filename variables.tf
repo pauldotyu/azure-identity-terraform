@@ -70,43 +70,22 @@ variable "aadds_subnet_routes" {
   description = "List of routes to allow traffic to the AD DS"
 }
 
-variable "vnet_peerings" {
-  type = list(object({
-    peering_name = string
-    resource_id  = string
-  }))
-  description = "List of virtual networks that needs to peer to hub"
-}
-
-variable "local_vm_username" {
+variable "netops_subscription_id" {
   type = string
 }
 
-variable "local_vm_password" {
+variable "netops_role_tag_value" {
   type = string
 }
 
-variable "aadds_domain_join_username" {
-  type        = string
-  description = "(optional) describe your variable"
+variable "devops_subscription_id" {
+  type = string
 }
 
-variable "domain_admin_username" {
-  type        = string
-  description = "(optional) describe your variable"
+variable "devops_keyvault_name" {
+  type = string
 }
 
-variable "domain_admin_password" {
-  type        = string
-  description = "(optional) describe your variable"
-}
-
-variable "log_analytics_workspace_id" {
-  type        = string
-  description = "(optional) describe your variable"
-}
-
-variable "log_analytics_workspace_key" {
-  type        = string
-  description = "(optional) describe your variable"
+variable "devops_keyvault_rg_name" {
+  type = string
 }
