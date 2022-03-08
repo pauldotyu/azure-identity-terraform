@@ -459,7 +459,7 @@ resource "azurerm_dev_test_global_vm_shutdown_schedule" "aadds" {
   location           = azurerm_resource_group.aadds.location
   enabled            = true
 
-  daily_recurrence_time = "1000"
+  daily_recurrence_time = "2200"
   timezone              = "Pacific Standard Time"
 
   notification_settings {
