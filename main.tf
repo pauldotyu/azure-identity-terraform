@@ -142,7 +142,7 @@ resource "azurerm_network_security_group" "aadds" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "636"
-    source_address_prefix      = "*"
+    source_address_prefix      = "10.21.0.0/28"
     destination_address_prefix = "*"
   }
 
