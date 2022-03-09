@@ -72,9 +72,13 @@ jobs:
       with:
         cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
+    # Get backend configuration file
+    - name: Terraform backend config
+      run: echo ${{ secrets.TF_BACKEND_CONFIG }} >> config.remote.tfbackend
+
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
-      run: terraform init
+      run: terraform init --backend-config=config.remote.tfbackend
 
     # Checks that all Terraform configuration files adhere to a canonical format
     - name: Terraform Format
